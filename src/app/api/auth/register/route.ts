@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { hashPassword } from '@/lib/auth/utils';
 import { createApiResponse, createErrorResponse } from '@/lib/api/utils';
 import { handleApiError } from '@/lib/api/middleware';
 
@@ -28,6 +28,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        createErrorResponse('Validation Error', '有効なメールアドレスを入力してください'),
+        { status: 400 }
+      );
+    }
+
     // 既存ユーザーのチェック
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -41,14 +49,14 @@ export async function POST(request: NextRequest) {
     }
 
     // パスワードをハッシュ化
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await hashPassword(password);
 
     // ユーザーを作成
     const user = await prisma.user.create({
       data: {
-        email,
+        email: email.trim(),
         password: hashedPassword,
-        name: name || null,
+        name: name ? name.trim() : null,
       },
       select: {
         id: true,
